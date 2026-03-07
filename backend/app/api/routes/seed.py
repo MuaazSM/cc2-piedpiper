@@ -1,15 +1,18 @@
 """
-Dev seed endpoint — populates the database with synthetic test data.
+Dev seed endpoint — populates the database with test data.
 
-POST /dev/seed generates fake shipments and vehicles using the
-synthetic generator and inserts them directly into the DB.
-Supports both normal and surge modes, with configurable counts.
+POST /dev/seed supports multiple data sources:
+- synthetic (default): generated Indian city freight data
+- solomon_c101: Solomon C101 clustered benchmark
+- solomon_r101: Solomon R101 random benchmark
 
 Query params:
-- shipment_count: how many shipments to generate (default 20)
-- vehicle_count: how many vehicles to generate (default 10)
-- mode: "normal" or "surge" (default "normal")
-- clear: if true, wipes existing data first (default true)
+- dataset: which data source to use
+- shipment_count: how many shipments (synthetic only)
+- vehicle_count: how many vehicles (synthetic only)
+- max_customers: limit Solomon customers (e.g. 25 for quick tests)
+- mode: "normal" or "surge" (synthetic only)
+- clear: wipe existing data first (default true)
 """
 
 from fastapi import APIRouter, Depends, Query
@@ -18,63 +21,103 @@ from backend.app.db.session import get_db
 from backend.app.models.shipment import Shipment
 from backend.app.models.vehicle import Vehicle
 from backend.app.data_loader.synthetic_generator import SyntheticGenerator
+from backend.app.data_loader.solomon_mapper import (
+    load_c101, load_r101, get_benchmark_info,
+)
 from datetime import datetime
+from typing import Optional
 
 router = APIRouter()
 
 
 @router.post("/seed")
 def seed_data(
-    shipment_count: int = Query(20, ge=1, le=500, description="Number of shipments to generate"),
-    vehicle_count: int = Query(10, ge=1, le=100, description="Number of vehicles to generate"),
-    mode: str = Query("normal", description="Generation mode: 'normal' or 'surge'"),
-    clear: bool = Query(True, description="Clear existing shipments and vehicles before seeding"),
+    dataset: str = Query("synthetic", description="Data source: 'synthetic', 'solomon_c101', or 'solomon_r101'"),
+    shipment_count: int = Query(20, ge=1, le=500, description="Number of shipments (synthetic only)"),
+    vehicle_count: int = Query(10, ge=1, le=100, description="Number of vehicles (synthetic only)"),
+    max_customers: Optional[int] = Query(None, ge=1, le=100, description="Limit Solomon customers (e.g. 25)"),
+    mode: str = Query("normal", description="Generation mode: 'normal' or 'surge' (synthetic only)"),
+    clear: bool = Query(True, description="Clear existing data before seeding"),
     db: Session = Depends(get_db),
 ):
     """
-    Seed the database with synthetic Indian freight data.
+    Seed the database with shipment and vehicle data.
 
-    This is the fastest way to get a working demo:
-    1. Hit POST /dev/seed
-    2. Hit POST /optimize
-    3. Hit POST /simulate?plan_id=1
-    4. Open the frontend dashboard
+    Three data sources:
+    - synthetic: AI-generated Indian freight data (fastest for demos)
+    - solomon_c101: Clustered benchmark (validates solver quality)
+    - solomon_r101: Random benchmark (stress-tests solver)
 
-    The clear=true default means each seed call gives you a fresh dataset.
-    Set clear=false if you want to accumulate data across multiple calls.
+    Solomon datasets are read from dataset/C1/C101.csv and dataset/R1/R101.csv.
+    Use max_customers=25 for quick tests, omit for full 100-customer instance.
     """
-    generator = SyntheticGenerator()
-
-    # Optionally wipe existing data so we start fresh
+    # Optionally wipe existing data
     if clear:
         db.query(Shipment).delete()
         db.query(Vehicle).delete()
         db.commit()
 
-    # Generate shipments and vehicles using the synthetic generator
-    raw_shipments = generator.generate_shipments(count=shipment_count, mode=mode)
-    raw_vehicles = generator.generate_vehicles(count=vehicle_count)
+    # --- Generate data based on selected source ---
+    if dataset == "solomon_c101":
+        raw_shipments, raw_vehicles = load_c101(max_customers=max_customers)
+        benchmark = get_benchmark_info("C101_25" if max_customers and max_customers <= 25 else "C101")
+        source_info = {
+            "dataset": "Solomon C101 (Clustered)",
+            "benchmark_optimal_vehicles": benchmark.get("vehicles"),
+            "max_customers": max_customers or "all",
+        }
 
-    # Convert generated dicts into ORM objects and add to session.
-    # We parse the ISO datetime strings back into datetime objects
-    # since the generator outputs strings (for JSON compatibility).
+    elif dataset == "solomon_r101":
+        raw_shipments, raw_vehicles = load_r101(max_customers=max_customers)
+        benchmark = get_benchmark_info("R101_25" if max_customers and max_customers <= 25 else "R101")
+        source_info = {
+            "dataset": "Solomon R101 (Random)",
+            "benchmark_optimal_vehicles": benchmark.get("vehicles"),
+            "max_customers": max_customers or "all",
+        }
+
+    elif dataset == "synthetic":
+        generator = SyntheticGenerator()
+        raw_shipments = generator.generate_shipments(count=shipment_count, mode=mode)
+        raw_vehicles = generator.generate_vehicles(count=vehicle_count)
+        generator.export_to_json(raw_shipments, raw_vehicles)
+        source_info = {
+            "dataset": "Synthetic Indian freight",
+            "mode": mode,
+        }
+
+    else:
+        return {
+            "error": f"Unknown dataset '{dataset}'. Use 'synthetic', 'solomon_c101', or 'solomon_r101'.",
+        }
+
+    # --- Insert shipments into DB ---
     shipments_created = 0
     for s in raw_shipments:
+        # Parse pickup/delivery times — handle both string and datetime
+        pickup = s.get("pickup_time")
+        delivery = s.get("delivery_time")
+        if isinstance(pickup, str):
+            pickup = datetime.fromisoformat(pickup)
+        if isinstance(delivery, str):
+            delivery = datetime.fromisoformat(delivery)
+
         db_shipment = Shipment(
             shipment_id=s["shipment_id"],
             origin=s["origin"],
             destination=s["destination"],
-            pickup_time=datetime.fromisoformat(s["pickup_time"]),
-            delivery_time=datetime.fromisoformat(s["delivery_time"]),
+            pickup_time=pickup,
+            delivery_time=delivery,
             weight=s["weight"],
             volume=s["volume"],
-            priority=s["priority"],
-            special_handling=s["special_handling"],
-            status=s["status"],
+            priority=s.get("priority", "MEDIUM"),
+            special_handling=s.get("special_handling"),
+            status=s.get("status", "PENDING"),
         )
         db.add(db_shipment)
         shipments_created += 1
 
+    # --- Insert vehicles into DB ---
     vehicles_created = 0
     for v in raw_vehicles:
         db_vehicle = Vehicle(
@@ -87,16 +130,11 @@ def seed_data(
         db.add(db_vehicle)
         vehicles_created += 1
 
-    # Commit everything in one transaction
     db.commit()
-
-    # Also export to JSON files for inspection / sharing with the team
-    generator.export_to_json(raw_shipments, raw_vehicles)
 
     return {
         "message": "Database seeded successfully.",
-        "mode": mode,
         "shipments_created": shipments_created,
         "vehicles_created": vehicles_created,
-        "note": "JSON files also saved to data/synthetic/",
+        **source_info,
     }

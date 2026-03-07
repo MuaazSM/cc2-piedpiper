@@ -1,0 +1,86 @@
+# ===========================================================================
+# Lorri — Docker Compose Configuration
+#
+# Spins up two services:
+#   1. db  — PostgreSQL 15 database with persistent storage
+#   2. app — FastAPI backend connected to the database
+#
+# Usage:
+#   docker-compose up --build        # Build and start everything
+#   docker-compose up -d             # Start in background
+#   docker-compose down              # Stop everything
+#   docker-compose down -v           # Stop and delete database volume
+#
+# The API will be available at http://localhost:8000
+# Swagger docs at http://localhost:8000/docs
+# ===========================================================================
+
+services:
+  # -------------------------------------------------------------------------
+  # PostgreSQL Database
+  #
+  # Stores all shipment, vehicle, plan, and scenario data.
+  # Data persists across container restarts via the named volume.
+  # The health check ensures the app doesn't start before the DB is ready.
+  # -------------------------------------------------------------------------
+  db:
+    image: postgres:15-alpine
+    container_name: lorri-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lorri
+      POSTGRES_PASSWORD: lorri
+      POSTGRES_DB: lorri_db
+    ports:
+      # Expose on 5433 externally to avoid conflicts if you have
+      # a local Postgres running on the default 5432
+      - "5433:5432"
+    volumes:
+      # Named volume for persistent data — survives container restarts.
+      # Use `docker-compose down -v` to wipe it clean.
+      - lorri_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # pg_isready checks if Postgres is accepting connections.
+      # The app service waits for this before starting.
+      test: ["CMD-SHELL", "pg_isready -U lorri -d lorri_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # -------------------------------------------------------------------------
+  # FastAPI Backend
+  #
+  # The main application server. Builds from the backend Dockerfile
+  # with the repo root as build context (so import paths work).
+  # Waits for the database to be healthy before starting.
+  # -------------------------------------------------------------------------
+  app:
+    build:
+      # Context is the repo root — NOT backend/ — because our Python
+      # imports use `backend.app.models` which needs `backend/` to be
+      # a subdirectory of the working directory, not the root itself.
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: lorri-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      # Load environment variables from the docker-specific env file.
+      # This overrides DATABASE_URL to point at the db container.
+      - backend/.env.docker
+    depends_on:
+      # Wait for the db health check to pass before starting the app.
+      # This prevents "connection refused" errors on first boot.
+      db:
+        condition: service_healthy
+    volumes:
+      # Mount the data directory so generated synthetic data and
+      # ML model files persist across container restarts.
+      - ./data:/app/data
+      # Mount the ML model directory so trained models persist.
+      - ./backend/app/ml/model:/app/backend/app/ml/model
+
+# Named volume for PostgreSQL data persistence
+volumes:
+  lorri_pgdata:

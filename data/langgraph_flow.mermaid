@@ -1,0 +1,35 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	validation_node(validation_node)
+	compatibility_node(compatibility_node)
+	guardrail_node(guardrail_node)
+	solver_node(solver_node)
+	relaxation_node(relaxation_node)
+	simulation_node(simulation_node)
+	insight_node(insight_node)
+	scenario_rec_node(scenario_rec_node)
+	metrics_node(metrics_node)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> validation_node;
+	compatibility_node --> guardrail_node;
+	guardrail_node -.-> compatibility_node;
+	guardrail_node -.-> solver_node;
+	insight_node -.-> metrics_node;
+	insight_node -.-> scenario_rec_node;
+	relaxation_node --> solver_node;
+	scenario_rec_node --> metrics_node;
+	simulation_node --> insight_node;
+	solver_node -.-> insight_node;
+	solver_node -.-> relaxation_node;
+	solver_node -.-> simulation_node;
+	validation_node -. &nbsp;end&nbsp; .-> __end__;
+	validation_node -.-> compatibility_node;
+	metrics_node --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

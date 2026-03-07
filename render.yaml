@@ -1,0 +1,85 @@
+# ===========================================================================
+# Render Blueprint — Deployment Configuration
+#
+# Defines the infrastructure for deploying Lorri's backend on Render.
+# When connected to the repo, Render reads this file and auto-provisions:
+#   1. A web service running the FastAPI backend
+#   2. A managed PostgreSQL database
+#
+# To deploy:
+#   1. Push this file to your repo
+#   2. Go to https://dashboard.render.com/blueprints
+#   3. Click "New Blueprint Instance" and connect your repo
+#   4. Render will auto-detect this file and set everything up
+#
+# After deployment, manually add GOOGLE_API_KEY in the Render dashboard
+# under the web service's Environment tab.
+# ===========================================================================
+
+services:
+  # -------------------------------------------------------------------------
+  # FastAPI Web Service
+  #
+  # Builds from the Dockerfile and runs the backend API.
+  # Render handles SSL, scaling, and health monitoring.
+  # -------------------------------------------------------------------------
+  - type: web
+    name: lorri-backend
+    runtime: docker
+
+    # Path to the Dockerfile relative to repo root
+    dockerfilePath: backend/Dockerfile
+
+    # Build context — repo root, so the COPY and import paths work correctly
+    dockerContext: .
+
+    # Render region — Oregon is the default and cheapest
+    region: oregon
+
+    # Instance plan — free tier for hackathon, upgrade for production
+    plan: free
+
+    # Health check path — Render pings this to verify the service is alive
+    healthCheckPath: /health
+
+    # Environment variables — DATABASE_URL is auto-injected by Render
+    # when you link the database below. GOOGLE_API_KEY must be added
+    # manually in the Render dashboard.
+    envVars:
+      # This special syntax tells Render to use the connection string
+      # from the database defined below. Render handles the actual
+      # URL (host, port, credentials) automatically.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lorri-db
+          property: connectionString
+
+      # Placeholder — set the real key in Render's dashboard after deploy.
+      # The app works without it (LLM summaries just become null).
+      - key: GOOGLE_API_KEY
+        value: ""
+
+      - key: OPENAI_API_KEY
+        value: ""
+
+      # Tell Python not to buffer stdout — ensures logs show up
+      # immediately in Render's log viewer instead of being batched.
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+  # -------------------------------------------------------------------------
+  # PostgreSQL Database
+  #
+  # Render's managed Postgres — auto-provisioned, auto-backed-up.
+  # The connection string is injected into the web service above.
+  # -------------------------------------------------------------------------
+databases:
+  - name: lorri-db
+    plan: free
+    region: oregon
+
+    # Database name inside the Postgres instance
+    databaseName: lorri_db
+
+    # Render auto-generates a secure user and password.
+    # The connection string is made available to linked services.
