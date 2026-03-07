@@ -583,7 +583,7 @@ export default function Home() {
         .footer-grid {
           padding: 3.5rem 3rem 2rem;
           display: grid;
-          grid-template-columns: 2fr 1fr 1fr 1fr;
+          grid-template-columns: 2fr 1fr 1fr;
           gap: 3rem;
         }
         .footer-brand {
@@ -962,12 +962,6 @@ export default function Home() {
           <div>
             <div className="footer-col-title">Stack</div>
             {['OR-Tools MIP','LangChain Agents','scikit-learn','Leaflet Maps','Recharts','SQLite / PG'].map(t => (
-              <span key={t} className="footer-link">{t}</span>
-            ))}
-          </div>
-          <div>
-            <div className="footer-col-title">Team</div>
-            {['Manikya — Frontend','Muaaz — AI & Backend','Vaishnavi — OR Engine','Rajkumar — OR Engine'].map(t => (
               <span key={t} className="footer-link">{t}</span>
             ))}
           </div>
