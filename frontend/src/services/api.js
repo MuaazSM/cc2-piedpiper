@@ -4,7 +4,7 @@ const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 const api = axios.create({
   baseURL: BASE,
-  timeout: 30000,
+  timeout: 120_000,
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -19,25 +19,25 @@ api.interceptors.response.use(
 
 // ── Shipments — POST /shipments · GET /shipments ──────────
 export const shipmentApi = {
-  getAll:  ()       => api.get('/shipments'),
+  getAll:  (params) => api.get('/shipments', { params }),
   create:  (data)   => api.post('/shipments', data),
-  seed:    ()       => api.post('/seed'),          // seed synthetic data
+  seed:    (params) => api.post('/dev/seed', null, { params }),
 }
 
 // ── Optimize — POST /optimize · GET /plan/{id} ────────────
 export const optimizeApi = {
-  run:     (body)   => api.post('/optimize', body),
+  run:     (params) => api.post('/optimize', null, { params }),
   getPlan: (id)     => api.get(`/plan/${id}`),
 }
 
 // ── Simulate — POST /simulate ─────────────────────────────
 export const simulateApi = {
-  run:     (body)   => api.post('/simulate', body),
+  run:     (params) => api.post('/simulate', null, { params }),
 }
 
 // ── Metrics — GET /metrics ────────────────────────────────
 export const metricsApi = {
-  get:     ()       => api.get('/metrics'),
+  get:     (planId) => api.get('/metrics', { params: { plan_id: planId } }),
 }
 
 export default api

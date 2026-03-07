@@ -52,8 +52,8 @@ const FEATURES = [
   {
     num: '02',
     tag: 'Intelligence',
-    title: 'Four-Agent LangChain Pipeline',
-    desc: 'A sequential AI pipeline validates inputs, explains outputs in plain language, relaxes blocking constraints, and recommends the best plan across all scenarios.',
+    title: 'Four-Agent LangGraph Pipeline',
+    desc: 'An agentic decision loop validates inputs, explains outputs in plain language, relaxes blocking constraints, and recommends the best plan across all scenarios.',
     bullets: ['Validation before solve', 'Human-readable insights', 'Constraint relaxation suggestions'],
     to: '/insights',
   },
@@ -723,7 +723,7 @@ export default function Home() {
           </h1>
 
           <p className="hero-sub">
-            {['Lorri','uses','OR-Tools','+','LangChain','agents','to','consolidate','your','shipments','—','cutting','trips,','costs,','and','carbon','in','seconds.'].map((w, i) => (
+            {['Lorri','uses','OR-Tools','+','LangGraph','agents','to','consolidate','your','shipments'].map((w, i) => (
               <span key={i} className="blur-word-sub" style={{ animationDelay: `${0.65 + i * 0.042}s`, marginRight: '0.3em' }}>{w}</span>
             ))}
           </p>

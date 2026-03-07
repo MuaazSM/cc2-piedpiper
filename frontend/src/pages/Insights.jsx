@@ -473,7 +473,7 @@ export default function Insights() {
           <div>
             <div className="ins-hero-tag">
               <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="5"/><path d="M9 13v2a3 3 0 0 0 6 0v-2"/></svg>
-              LangChain · 4-Agent Pipeline
+              LANGGRAPH · 4-AGENT LOOP
             </div>
             <h1>
               <div className="blur-line">
@@ -488,7 +488,7 @@ export default function Insights() {
               </div>
             </h1>
             <p className="ins-hero-sub">
-              A sequential LangChain pipeline validates your batch, explains the solver's output, suggests constraint relaxations, and recommends the best scenario — all in plain language.
+              An agentic LangGraph loop validates your batch, explains the solver's output, suggests constraint relaxations, and recommends the best scenario — all in plain language.
             </p>
             <div className="ins-pipeline-badge">
               {['Validator', 'Insight', 'Relaxation', 'Recommender'].map((step, i, arr) => (
@@ -511,7 +511,7 @@ export default function Insights() {
           {/* ── LEFT: Control ── */}
           <div className="ins-control-card">
             <div className="ins-ctrl-header">
-              <span className="ins-ctrl-header-label">/ pipeline · langchain</span>
+              <span className="ins-ctrl-header-label">/ PIPELINE · LANGGRAPH</span>
               <div className="ins-status-dot" />
             </div>
             <div className="ins-ctrl-body">
@@ -642,7 +642,7 @@ export default function Insights() {
           </div>
           <div>
             <div className="footer-col-title">Stack</div>
-            {['OR-Tools MIP','LangChain Agents','scikit-learn','Globe.gl','Recharts','SQLite / PG'].map(t => (
+            {['OR-Tools MIP','LangGraph Agents','scikit-learn','Globe.gl','Recharts','SQLite / PG'].map(t => (
               <span key={t} className="footer-link">{t}</span>
             ))}
           </div>

@@ -4,13 +4,6 @@ import {
 } from 'recharts'
 import { DEMO_METRICS } from '@/data/demoData'
 
-const CHART_DATA = [
-  { label: 'Trips',        before: DEMO_METRICS.before.trips,            after: DEMO_METRICS.after.trips },
-  { label: 'Utilization%', before: DEMO_METRICS.before.avg_utilization,   after: DEMO_METRICS.after.avg_utilization },
-  { label: 'Cost (₹k)',    before: DEMO_METRICS.before.total_cost / 1000, after: DEMO_METRICS.after.total_cost / 1000 },
-  { label: 'Carbon (kg)',  before: DEMO_METRICS.before.carbon_kg,          after: DEMO_METRICS.after.carbon_kg },
-]
-
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
@@ -32,7 +25,16 @@ const CustomTooltip = ({ active, payload, label }) => {
   )
 }
 
-export default function MetricsDashboard() {
+export default function MetricsDashboard({ metrics }) {
+  const m = metrics || DEMO_METRICS
+  const CHART_DATA = [
+    { label: 'Trips',        before: m.before?.trips ?? 6,            after: m.after?.trips ?? 3 },
+    { label: 'Utilization%', before: m.before?.avg_utilization ?? 62, after: m.after?.avg_utilization ?? 73 },
+    { label: 'Cost (₹k)',    before: (m.before?.total_cost ?? 24000) / 1000, after: (m.after?.total_cost ?? 13500) / 1000 },
+    { label: 'Carbon (kg)',  before: m.before?.carbon_kg ?? 1440,     after: m.after?.carbon_kg ?? 810 },
+  ]
+  const savings = m.savings || DEMO_METRICS.savings
+
   return (
     <div className="lorri-card p-6">
       <h4 className="font-display text-lg mb-6">Before vs After Optimization</h4>
@@ -50,9 +52,9 @@ export default function MetricsDashboard() {
       {/* Savings summary */}
       <div className="grid grid-cols-3 gap-4 mt-6 pt-5 border-t border-[var(--border)]">
         {[
-          { label: 'Cost Saved',    value: `₹${(DEMO_METRICS.savings.cost_saved/1000).toFixed(1)}k`, pct: `${DEMO_METRICS.savings.cost_saved_pct}%` },
-          { label: 'CO₂ Saved',     value: `${DEMO_METRICS.savings.carbon_saved_kg}kg`,              pct: `${DEMO_METRICS.savings.carbon_saved_pct}%` },
-          { label: 'Trips Saved',   value: `${DEMO_METRICS.savings.trips_reduced}`,                  pct: '50% fewer' },
+          { label: 'Cost Saved',    value: `₹${((savings.cost_saved ?? 10500)/1000).toFixed(1)}k`, pct: `${savings.cost_saved_pct ?? 44}%` },
+          { label: 'CO₂ Saved',     value: `${savings.carbon_saved_kg ?? 630}kg`,                  pct: `${savings.carbon_saved_pct ?? 44}%` },
+          { label: 'Trips Saved',   value: `${savings.trips_reduced ?? 3}`,                        pct: `${Math.round(((savings.trips_reduced ?? 3) / (m.before?.trips ?? 6)) * 100)}% fewer` },
         ].map(item => (
           <div key={item.label} className="text-center">
             <p className="font-display text-2xl font-600" style={{ color: 'var(--page-accent)' }}>
