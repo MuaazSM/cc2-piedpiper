@@ -1,0 +1,259 @@
+/* ── Google Fonts — MUST be before @tailwind ── */
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────
+   CSS VARIABLES — Per-page theme system
+   Each page sets --page-accent and --page-glow on <body>
+───────────────────────────────────────────────────────── */
+:root {
+  --page-accent:     #f59e0b;   /* default: amber (Home) */
+  --page-glow:       #92400e;
+  --page-glow-rgb:   146, 64, 14;
+
+  --surface:         #0a0a0a;
+  --card:            #111111;
+  --card-hover:      #161616;
+  --border:          rgba(255,255,255,0.07);
+  --border-hover:    rgba(255,255,255,0.14);
+  --text-primary:    #f5f5f5;
+  --text-secondary:  #a3a3a3;
+  --text-muted:      #525252;
+
+  --radius:          12px;
+  --radius-lg:       18px;
+}
+
+/* ─── Page Themes ─────────────────────────────────────── */
+body[data-page="home"] {
+  --page-accent:    #f59e0b;
+  --page-glow:      #92400e;
+  --page-glow-rgb:  146, 64, 14;
+}
+body[data-page="shipments"] {
+  --page-accent:    #06b6d4;
+  --page-glow:      #164e63;
+  --page-glow-rgb:  22, 78, 99;
+}
+body[data-page="optimize"] {
+  --page-accent:    #10b981;
+  --page-glow:      #064e3b;
+  --page-glow-rgb:  6, 78, 59;
+}
+body[data-page="scenarios"] {
+  --page-accent:    #8b5cf6;
+  --page-glow:      #4c1d95;
+  --page-glow-rgb:  76, 29, 149;
+}
+body[data-page="insights"] {
+  --page-accent:    #f43f5e;
+  --page-glow:      #881337;
+  --page-glow-rgb:  136, 19, 55;
+}
+
+/* ─── Base Reset ──────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background-color: var(--surface);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: --page-accent 0.6s ease;
+}
+
+/* ─── Animated Gradient Background ───────────────────── */
+.page-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: var(--surface);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.page-bg::before {
+  content: '';
+  position: absolute;
+  bottom: -25%;
+  right: -18%;
+  width: 110vw;
+  height: 110vw;
+  max-width: 1400px;
+  max-height: 1400px;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(var(--page-glow-rgb), 0.65) 0%,
+    rgba(var(--page-glow-rgb), 0.35) 25%,
+    rgba(var(--page-glow-rgb), 0.14) 50%,
+    rgba(var(--page-glow-rgb), 0.04) 70%,
+    transparent 85%
+  );
+  transition: background 0.8s ease;
+  animation: glowPulse 6s ease-in-out infinite;
+}
+
+.page-bg::after {
+  content: '';
+  position: absolute;
+  top: -15%;
+  left: 5%;
+  width: 60vw;
+  height: 60vw;
+  max-width: 700px;
+  max-height: 700px;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(var(--page-glow-rgb), 0.22) 0%,
+    rgba(var(--page-glow-rgb), 0.08) 50%,
+    transparent 70%
+  );
+  transition: background 0.8s ease;
+  animation: glowPulse 8s ease-in-out infinite reverse;
+}
+
+@keyframes glowPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.7; transform: scale(1.08); }
+}
+
+/* ─── Layout ──────────────────────────────────────────── */
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── Cards ───────────────────────────────────────────── */
+.lorri-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.lorri-card:hover {
+  border-color: var(--border-hover);
+  background: var(--card-hover);
+}
+
+/* ─── Accent Elements ─────────────────────────────────── */
+.accent-text  { color: var(--page-accent); }
+.accent-border{ border-color: var(--page-accent); }
+
+.accent-glow {
+  box-shadow: 0 0 20px rgba(var(--page-glow-rgb), 0.4),
+              0 0 60px rgba(var(--page-glow-rgb), 0.15);
+}
+
+/* ─── Fox Mascot ──────────────────────────────────────── */
+.fox-stroke {
+  stroke: var(--page-accent);
+  fill: none;
+  transition: stroke 0.6s ease;
+}
+.fox-stroke-secondary {
+  stroke: color-mix(in srgb, var(--page-accent) 50%, white);
+  fill: none;
+  transition: stroke 0.6s ease;
+}
+
+/* ─── Progress / Utilization bars ────────────────────── */
+.util-bar-bg {
+  background: rgba(255,255,255,0.06);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+.util-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--page-glow), var(--page-accent));
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+
+/* ─── Blur Word Sweep — shared across all pages ──────── */
+.blur-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.22em;
+  line-height: 1.0;
+  margin-bottom: 0.1em;
+}
+.blur-line.centered { justify-content: center; }
+
+.blur-word {
+  display: inline-block;
+  opacity: 0;
+  filter: blur(16px);
+  transform: translateX(-14px);
+  animation: blurWordIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes blurWordIn {
+  0%   { opacity: 0;   filter: blur(16px); transform: translateX(-14px); }
+  55%  { opacity: 0.9; filter: blur(2px);  transform: translateX(2px);  }
+  100% { opacity: 1;   filter: blur(0px);  transform: translateX(0);    }
+}
+
+.blur-word-sub {
+  display: inline-block;
+  opacity: 0;
+  filter: blur(8px);
+  transform: translateX(-8px);
+  animation: blurWordSub 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes blurWordSub {
+  0%   { opacity: 0; filter: blur(8px); transform: translateX(-8px); }
+  100% { opacity: 1; filter: blur(0);   transform: translateX(0);    }
+}
+/* ─── Scrollbar ───────────────────────────────────────── */
+::-webkit-scrollbar       { width: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--page-accent); }
+
+/* ─── Typography ──────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+}
+.font-display { font-family: 'Syne', sans-serif; }
+.font-mono    { font-family: 'JetBrains Mono', monospace; }
+
+/* ─── Transitions for page change ────────────────────── */
+.page-enter {
+  animation: pageIn 0.4s ease forwards;
+}
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Leaflet override to match dark theme ─────────── */
+.leaflet-container {
+  background: #0a0a0a !important;
+  border-radius: var(--radius);
+}
+.leaflet-tile {
+  filter: brightness(0.5) saturate(0.4);
+}
+
+/* ─── Recharts override ───────────────────────────────── */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: var(--border) !important;
+}
+.recharts-text { fill: var(--text-muted) !important; }
