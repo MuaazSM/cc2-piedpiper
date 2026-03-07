@@ -37,7 +37,7 @@ from backend.app.agents.relaxation_agent import run_relaxation_analysis
 from backend.app.agents.scenario_agent import run_scenario_analysis
 from backend.app.agents.guardrail import run_guardrail
 from backend.app.ml.compatibility_model import CompatibilityModel
-
+from backend.app.agents.tools.shipment_data_tool import fetch_shipment_data
 
 # ---------------------------------------------------------------------------
 # AgentState — the typed state that flows through the entire graph
@@ -128,6 +128,74 @@ def _timed_step(name: str, func, state: AgentState) -> tuple:
 # ---------------------------------------------------------------------------
 # Node functions — each takes AgentState, returns partial state update
 # ---------------------------------------------------------------------------
+
+def shipment_data_node(state: AgentState) -> dict:
+    """
+    OBSERVE PHASE (Step 0) — Fetch shipment and vehicle data from the database.
+
+    This is the very first node in the pipeline. It loads all data
+    from the DB into AgentState so every downstream node has something
+    to work with.
+
+    If the DB is empty (no shipments or no vehicles), it sets an error
+    message which triggers the conditional edge to skip to END.
+    """
+    start = time.time()
+
+    try:
+        # If data was already provided (e.g. during testing or direct invocation),
+        # skip the DB fetch and use what's already in state.
+        if state["shipments"] and state["vehicles"]:
+            duration = (time.time() - start) * 1000
+            timing = {"step": "Shipment Data Tool", "status": "completed", "duration_ms": round(duration, 1), "error": None}
+            print(f"[Shipment Data Tool] Using pre-loaded data: {len(state['shipments'])} shipments, {len(state['vehicles'])} vehicles")
+            return {
+                "step_timings": state["step_timings"] + [timing],
+            }
+
+        shipments, vehicles = fetch_shipment_data()
+
+        # Check for empty data — no point running the pipeline on nothing
+        if not shipments:
+            duration = (time.time() - start) * 1000
+            timing = {"step": "Shipment Data Tool", "status": "completed", "duration_ms": round(duration, 1), "error": None}
+            return {
+                "shipments": [],
+                "vehicles": vehicles,
+                "error": "No shipments found. Upload shipments first via POST /shipments or POST /dev/seed.",
+                "step_timings": state["step_timings"] + [timing],
+            }
+
+        if not vehicles:
+            duration = (time.time() - start) * 1000
+            timing = {"step": "Shipment Data Tool", "status": "completed", "duration_ms": round(duration, 1), "error": None}
+            return {
+                "shipments": shipments,
+                "vehicles": [],
+                "error": "No vehicles found. Seed vehicle fleet first via POST /dev/seed.",
+                "step_timings": state["step_timings"] + [timing],
+            }
+
+        duration = (time.time() - start) * 1000
+        timing = {"step": "Shipment Data Tool", "status": "completed", "duration_ms": round(duration, 1), "error": None}
+
+        print(f"[Shipment Data Tool] Loaded {len(shipments)} shipments and {len(vehicles)} vehicles")
+
+        return {
+            "shipments": shipments,
+            "vehicles": vehicles,
+            "step_timings": state["step_timings"] + [timing],
+        }
+
+    except Exception as e:
+        duration = (time.time() - start) * 1000
+        timing = {"step": "Shipment Data Tool", "status": "failed", "duration_ms": round(duration, 1), "error": str(e)}
+        return {
+            "shipments": [],
+            "vehicles": [],
+            "error": f"Failed to load data from database: {str(e)}",
+            "step_timings": state["step_timings"] + [timing],
+        }
 
 def validation_node(state: AgentState) -> dict:
     """
@@ -461,6 +529,16 @@ def metrics_node(state: AgentState) -> dict:
 # Conditional edge functions — control the graph routing
 # ---------------------------------------------------------------------------
 
+def after_data_load(state: AgentState) -> str:
+    """
+    Route after Shipment Data Tool.
+    If data loading failed or DB is empty (error is set), go to END.
+    Otherwise proceed to validation.
+    """
+    if state.get("error"):
+        return "end"
+    return "validation_node"
+
 def after_validation(state: AgentState) -> str:
     """
     Route after Validation Node.
@@ -551,16 +629,25 @@ def build_graph() -> StateGraph:
     """
     Construct and compile the full LangGraph state graph.
 
-    This is where all the nodes and edges are wired together.
-    The graph is compiled once and can be invoked multiple times.
+    Node sequence:
+    shipment_data_node -> validation_node -> compatibility_node ->
+    guardrail_node -> solver_node -> simulation_node -> insight_node ->
+    scenario_rec_node -> metrics_node
+
+    With conditional edges for:
+    - Empty DB -> END
+    - Validation failure -> END
+    - Guardrail violations -> re-run compatibility
+    - Solver infeasibility -> relaxation -> retry solver
+    - Retries exhausted -> insight -> END
 
     Returns:
         Compiled StateGraph ready for invocation
     """
-    # Create the graph with our typed state
     graph = StateGraph(AgentState)
 
     # --- Register all nodes ---
+    graph.add_node("shipment_data_node", shipment_data_node)
     graph.add_node("validation_node", validation_node)
     graph.add_node("compatibility_node", compatibility_node)
     graph.add_node("guardrail_node", guardrail_node)
@@ -571,10 +658,16 @@ def build_graph() -> StateGraph:
     graph.add_node("scenario_rec_node", scenario_rec_node)
     graph.add_node("metrics_node", metrics_node)
 
-    # --- Set the entry point ---
-    graph.set_entry_point("validation_node")
+    # --- Set the entry point: data loading comes first ---
+    graph.set_entry_point("shipment_data_node")
 
     # --- Wire conditional edges ---
+
+    # After data load: end if empty DB, else validate
+    graph.add_conditional_edges("shipment_data_node", after_data_load, {
+        "end": END,
+        "validation_node": "validation_node",
+    })
 
     # After validation: end if invalid, else proceed to compatibility
     graph.add_conditional_edges("validation_node", after_validation, {
@@ -616,9 +709,7 @@ def build_graph() -> StateGraph:
     # After metrics: end
     graph.add_edge("metrics_node", END)
 
-    # --- Compile the graph ---
     compiled = graph.compile()
-
     return compiled
 
 
@@ -626,9 +717,7 @@ def build_graph() -> StateGraph:
 # Main entry point — replaces orchestrator.run_pipeline()
 # ---------------------------------------------------------------------------
 
-# Compile the graph once at module load time.
-# This is safe because the graph structure doesn't change between runs —
-# only the state changes.
+# Re-compile the graph with the new data loading node
 pipeline = build_graph()
 
 
@@ -727,10 +816,15 @@ def run_pipeline(
     if not cfg.get("run_llm", True):
         os.environ["GOOGLE_API_KEY"] = ""
 
-    # Build the initial state
+    # Build the initial state.
+    # Shipments and vehicles start empty — the shipment_data_node
+    # will populate them from the database as the first step.
+    # If shipments/vehicles were passed in directly (e.g. for testing),
+    # use those instead and the data tool will be a no-op since the
+    # after_data_load edge checks state["error"], not state["shipments"].
     initial_state = {
-        "shipments": shipments,
-        "vehicles": vehicles,
+        "shipments": shipments if shipments else [],
+        "vehicles": vehicles if vehicles else [],
         "config": cfg,
         "validation_report": None,
         "compatibility_scores": None,

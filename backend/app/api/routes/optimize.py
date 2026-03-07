@@ -1,21 +1,17 @@
 """
 Optimization endpoint — triggers the full LangGraph agent pipeline.
 
-POST /optimize loads data from the DB, runs the LangGraph state graph
-(Validate → Reason → Decide → Act → Learn), saves results to the DB,
-and returns the unified response.
+POST /optimize runs the LangGraph state graph which handles everything:
+data loading, validation, ML scoring, guardrail, solver, simulation,
+insights, scenario recommendation, and metrics.
 
-Query params for pipeline configuration:
-- run_simulation: run the 4 scenario simulations (default true)
-- run_llm: generate LLM narratives via Gemini (default true)
-- cost_weight / sla_weight / carbon_weight: scenario comparison weights
+The route is now a thin wrapper — it invokes the graph, saves results
+to the DB, and returns the unified response.
 """
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from backend.app.db.session import get_db
-from backend.app.models.shipment import Shipment
-from backend.app.models.vehicle import Vehicle
 from backend.app.models.plan import (
     ConsolidationPlan, PlanAssignment, ScenarioResult,
     PlanStatusEnum, ScenarioTypeEnum,
@@ -24,31 +20,6 @@ from backend.app.agents.langgraph_pipeline import run_pipeline
 import json
 
 router = APIRouter()
-
-
-def _empty_response(message: str, count: int, is_vehicle_error: bool = False) -> dict:
-    """
-    Build a standardized response for when the database is empty.
-    Keeps the response shape consistent so the frontend doesn't
-    need special handling for edge cases.
-    """
-    return {
-        "validation": {
-            "is_valid": False,
-            "errors": [{"severity": "ERROR", "shipment_id": None, "field": None, "message": message}],
-            "warnings": [], "info": [],
-            "summary_counts": {
-                "total_shipments": 0 if not is_vehicle_error else count,
-                "total_vehicles": count if not is_vehicle_error else 0,
-                "error_count": 1, "warning_count": 0, "info_count": 0,
-            },
-            "llm_summary": None,
-        },
-        "plan": None, "compatibility": None, "guardrail": None,
-        "insights": None, "relaxation": None,
-        "scenarios": None, "scenario_analysis": None, "metrics": None,
-        "pipeline_metadata": {"steps": [], "total_duration_ms": 0, "retry_count": 0, "config": {}},
-    }
 
 
 @router.post("/optimize")
@@ -63,59 +34,14 @@ def run_optimization(
     """
     Trigger the full LangGraph optimization pipeline.
 
-    This endpoint:
-    1. Loads all shipments and vehicles from the database
-    2. Runs the LangGraph state graph (all 9 nodes with conditional routing)
-    3. Saves the resulting plan, assignments, and scenario results to the DB
-    4. Returns the unified response with all agent + solver outputs
-
-    The response always has the same shape — null fields for steps that
-    didn't run. The frontend renders different panels based on what's present.
+    The graph is now self-contained — it loads data from the DB,
+    runs all agents and tools, and returns the unified response.
+    This route just invokes the graph, persists the results, and
+    returns the response.
     """
-    # --- Load data from DB and convert to plain dicts ---
-    shipment_rows = db.query(Shipment).all()
-    vehicle_rows = db.query(Vehicle).all()
-
-    shipments = [
-        {
-            "shipment_id": s.shipment_id,
-            "origin": s.origin,
-            "destination": s.destination,
-            "pickup_time": s.pickup_time.isoformat() if s.pickup_time else None,
-            "delivery_time": s.delivery_time.isoformat() if s.delivery_time else None,
-            "weight": s.weight,
-            "volume": s.volume,
-            "priority": s.priority.value if s.priority else None,
-            "special_handling": s.special_handling,
-            "status": s.status.value if s.status else None,
-        }
-        for s in shipment_rows
-    ]
-
-    vehicles = [
-        {
-            "vehicle_id": v.vehicle_id,
-            "vehicle_type": v.vehicle_type,
-            "capacity_weight": v.capacity_weight,
-            "capacity_volume": v.capacity_volume,
-            "operating_cost": v.operating_cost,
-        }
-        for v in vehicle_rows
-    ]
-
-    # Handle empty database
-    if not shipments:
-        return _empty_response(
-            "No shipments found. Upload shipments first via POST /shipments or POST /dev/seed.",
-            len(vehicles),
-        )
-    if not vehicles:
-        return _empty_response(
-            "No vehicles found. Seed vehicle fleet first via POST /dev/seed.",
-            len(shipments), is_vehicle_error=True,
-        )
-
     # --- Run the LangGraph pipeline ---
+    # The graph handles its own data loading via the Shipment Data Tool.
+    # We only pass config — no shipments or vehicles needed here.
     config = {
         "run_simulation": run_simulation,
         "run_llm": run_llm,
@@ -124,7 +50,12 @@ def run_optimization(
         "carbon_weight": carbon_weight,
     }
 
-    result = run_pipeline(shipments, vehicles, config)
+    result = run_pipeline(shipments=[], vehicles=[], config=config)
+
+    # If the pipeline returned an error (empty DB, validation failure),
+    # return the result as-is — no DB persistence needed
+    if not result:
+        return result
 
     # --- Persist results to DB ---
     plan_data = result.get("plan")
