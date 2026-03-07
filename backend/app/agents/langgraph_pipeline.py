@@ -40,6 +40,7 @@ from backend.app.agents.tools.compatibility_scoring_tool import score_shipment_p
 from backend.app.agents.tools.scenario_simulation_tool import run_all_scenarios
 from backend.app.agents.tools.shipment_data_tool import fetch_shipment_data
 from backend.app.agents.tools.optimization_tool import run_optimization
+from backend.app.agents.tools.outcome_logging_tool import log_outcome, trigger_retraining
 from backend.app.optimizer.metrics import compute_full_metrics
 
 # ---------------------------------------------------------------------------
@@ -577,6 +578,67 @@ def metrics_node(state: AgentState) -> dict:
     }
 
 
+def outcome_logging_node(state: AgentState) -> dict:
+    """
+    LEARN PHASE — Log the complete optimization outcome to the database.
+
+    Persists everything: plan, violations, scenarios, metrics, pipeline
+    timings. Also checks if the compatibility model should be retrained
+    based on the number of accumulated outcomes.
+
+    This is the final node before END — it captures the full picture
+    of what happened during this optimization run for historical
+    tracking and model improvement.
+    """
+    start = time.time()
+
+    try:
+        # Build a response-like dict from state for the logger.
+        # The logger expects the same shape as the API response.
+        pipeline_result = {
+            "plan": state.get("consolidation_plan", {}),
+            "metrics": state.get("metrics", {}),
+            "scenarios": state.get("scenario_results"),
+            "guardrail": state.get("guardrail_result", {}),
+            "compatibility": state.get("compatibility_scores", {}),
+            "pipeline_metadata": {
+                "steps": state.get("step_timings", []),
+                "total_duration_ms": sum(
+                    s.get("duration_ms", 0) for s in state.get("step_timings", [])
+                ),
+                "retry_count": state.get("retry_count", 0),
+                "config": state.get("config", {}),
+            },
+        }
+
+        # Log the outcome to the database
+        log_result = log_outcome(pipeline_result)
+
+        # Check if retraining is due
+        if log_result.get("should_retrain", False):
+            retrain_result = trigger_retraining()
+        else:
+            retrain_result = None
+
+        status = "completed"
+        error = None
+
+    except Exception as e:
+        log_result = {"outcome_id": None, "error": str(e)}
+        retrain_result = None
+        status = "failed"
+        error = str(e)
+        print(f"[Outcome Logging Node] Failed: {e}")
+
+    duration = (time.time() - start) * 1000
+    timing = {"step": "Outcome Logger", "status": status,
+              "duration_ms": round(duration, 1), "error": error}
+
+    return {
+        "step_timings": state["step_timings"] + [timing],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Conditional edge functions — control the graph routing
 # ---------------------------------------------------------------------------
@@ -709,6 +771,7 @@ def build_graph() -> StateGraph:
     graph.add_node("insight_node", insight_node)
     graph.add_node("scenario_rec_node", scenario_rec_node)
     graph.add_node("metrics_node", metrics_node)
+    graph.add_node("outcome_logging_node", outcome_logging_node)
 
     # --- Set the entry point: data loading comes first ---
     graph.set_entry_point("shipment_data_node")
@@ -758,8 +821,11 @@ def build_graph() -> StateGraph:
     # After scenario rec: always proceed to metrics
     graph.add_edge("scenario_rec_node", "metrics_node")
 
-    # After metrics: end
-    graph.add_edge("metrics_node", END)
+    # After metrics: go to outcome logging
+    graph.add_edge("metrics_node", "outcome_logging_node")
+
+    # After outcome logging: end
+    graph.add_edge("outcome_logging_node", END)
 
     compiled = graph.compile()
     return compiled

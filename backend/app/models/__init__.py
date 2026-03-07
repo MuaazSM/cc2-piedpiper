@@ -19,3 +19,4 @@ from backend.app.models.plan import (
     PlanStatusEnum,
     ScenarioTypeEnum,
 )
+from backend.app.models.outcome import OptimizationOutcome
