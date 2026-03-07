@@ -46,9 +46,9 @@ class CompatibilityModel:
 
     def train(
         self,
-        n_pairs: int = 8000,
-        n_shipments: int = 200,
-        noise_rate: float = 0.07,
+        n_pairs: int = 15000,
+        n_shipments: int = 400,
+        noise_rate: float = 0.05,
         seed: int = 42,
         force_retrain: bool = False,
     ) -> Dict:
@@ -98,9 +98,10 @@ class CompatibilityModel:
         #  Train RandomForest 
         print("[Compatibility Model] Training RandomForest...")
         rf = RandomForestClassifier(
-            n_estimators=100,         # 100 trees — good balance of speed and accuracy
-            max_depth=10,             # Prevent overfitting on synthetic data
-            min_samples_leaf=5,       # Each leaf needs at least 5 samples
+            n_estimators=400,         # More trees = better ensemble averaging
+            max_depth=25,             # Deeper trees capture complex feature interactions
+            min_samples_leaf=2,       # Finer splits for better recall on compatible pairs
+            class_weight="balanced",  # Upweight the minority class (compatible pairs)
             random_state=seed,
             n_jobs=-1,                # Use all CPU cores for training
         )
@@ -111,9 +112,10 @@ class CompatibilityModel:
         #  Train LogisticRegression 
         print("[Compatibility Model] Training LogisticRegression...")
         lr = LogisticRegression(
-            max_iter=1000,            # Enough iterations to converge
+            max_iter=2000,            # More iterations for convergence with balanced weights
+            class_weight="balanced",  # Upweight minority class to improve recall
+            C=0.5,                    # Slightly stronger regularization
             random_state=seed,
-            C=1.0,                    # Regularization strength (default)
         )
         lr.fit(X_train_scaled, y_train)
         lr_pred = lr.predict(X_test_scaled)
