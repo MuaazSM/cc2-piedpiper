@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import Navbar from '@/components/layout/Navbar'
 import FoxMascot from '@/components/FoxMascot'
 import { DEMO_PLAN } from '@/data/demoData'
 
@@ -74,6 +76,7 @@ export default function Insights() {
   const [status, setStatus]         = useState('idle')
   const [revealed, setRevealed]     = useState([])
   const [activeAgent, setActiveAgent] = useState(null)
+  const nav = useNavigate()
 
   const runPipeline = async () => {
     setStatus('running')
@@ -89,6 +92,7 @@ export default function Insights() {
 
   return (
     <div className="lorri-insights">
+      <Navbar />
       <style>{`
         .lorri-insights {
           min-height: 100vh;
@@ -109,8 +113,6 @@ export default function Insights() {
         }
         .ins-inner {
           position: relative; z-index: 1;
-          max-width: 1160px;
-          margin: 0 auto;
           padding: 5rem 3rem 6rem;
           width: 100%;
         }
@@ -446,6 +448,22 @@ export default function Insights() {
           100% { opacity:1;   filter:blur(0);    transform:translateX(0); }
         }
         @keyframes spinIcon { to { transform: rotate(360deg); } }
+
+        .lorri-footer { border-top: 1px solid var(--border); position: relative; z-index: 1; }
+        .footer-grid { padding: 3.5rem 3rem 2rem; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 3rem; }
+        .footer-brand { font-family: 'Syne', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--page-accent); display: flex; align-items: center; gap: 8px; margin-bottom: 0.6rem; }
+        .footer-desc { font-size: 0.82rem; color: var(--text-muted); line-height: 1.7; max-width: 230px; margin-bottom: 1.2rem; }
+        .footer-badges { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+        .footer-badge { font-size: 0.65rem; font-family: 'JetBrains Mono', monospace; padding: 3px 8px; border-radius: 5px; border: 1px solid var(--border); color: var(--text-muted); cursor: default; transition: all 0.2s; }
+        .footer-badge:hover { border-color: var(--page-accent); color: var(--page-accent); }
+        .footer-col-title { font-family: 'Syne', sans-serif; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-secondary); margin-bottom: 1.1rem; }
+        .footer-link { display: block; font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.55rem; cursor: pointer; text-decoration: none; transition: all 0.2s ease; width: fit-content; }
+        .footer-link:hover { color: var(--page-accent); transform: translateX(3px); text-shadow: 0 0 10px rgba(var(--page-glow-rgb), 0.5); }
+        .footer-bottom { border-top: 1px solid var(--border); padding: 1.2rem 3rem; display: flex; align-items: center; justify-content: space-between; }
+        .footer-bottom-l { font-size: 0.72rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+        .footer-bottom-r { display: flex; gap: 1.5rem; }
+        .footer-bottom-link { font-size: 0.72rem; color: var(--text-muted); cursor: pointer; transition: color 0.2s; }
+        .footer-bottom-link:hover { color: var(--page-accent); }
       `}</style>
 
       <div className="ins-inner">
@@ -594,7 +612,57 @@ export default function Insights() {
             )}
           </div>
         </div>
-      </div>
+        </div>
+
+      <footer className="lorri-footer">
+        <div className="footer-grid">
+          <div>
+            <div className="footer-brand">
+              <svg viewBox="0 0 120 140" width="20" height="23" fill="none">
+                <path stroke="var(--page-accent)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" d="M28 42 L18 10 L44 30 Z"/>
+                <path stroke="var(--page-accent)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" d="M92 42 L102 10 L76 30 Z"/>
+                <path stroke="var(--page-accent)" strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" d="M22 70 Q18 50 28 42 Q44 30 60 28 Q76 30 92 42 Q102 50 98 70 Q96 90 80 100 Q70 108 60 110 Q50 108 40 100 Q24 90 22 70 Z"/>
+                <ellipse stroke="var(--page-accent)" strokeWidth="2" cx="42" cy="62" rx="7" ry="8"/>
+                <ellipse stroke="var(--page-accent)" strokeWidth="2" cx="78" cy="62" rx="7" ry="8"/>
+              </svg>
+              Lorri
+            </div>
+            <p className="footer-desc">AI-powered load consolidation. Fewer trucks, lower costs, less carbon — optimized in seconds using OR-Tools and LangChain.</p>
+            <div className="footer-badges">
+              {['OR-Tools','LangChain','FastAPI','React','Globe.gl','Recharts'].map(t => (
+                <span key={t} className="footer-badge">{t}</span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="footer-col-title">Product</div>
+            {[['Shipments','/shipments'],['Optimizer','/optimize'],['Scenarios','/scenarios'],['AI Insights','/insights']].map(([l,t]) => (
+              <span key={l} className="footer-link" onClick={() => nav(t)}>{l}</span>
+            ))}
+          </div>
+          <div>
+            <div className="footer-col-title">Stack</div>
+            {['OR-Tools MIP','LangChain Agents','scikit-learn','Globe.gl','Recharts','SQLite / PG'].map(t => (
+              <span key={t} className="footer-link">{t}</span>
+            ))}
+          </div>
+          <div>
+            <div className="footer-col-title">Team</div>
+            {['Manikya — Frontend','Muaaz — AI & Backend','Vaishnavi — OR Engine','Rajkumar — OR Engine'].map(t => (
+              <span key={t} className="footer-link">{t}</span>
+            ))}
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <span className="footer-bottom-l">© 2025 Lorri · Load Consolidation Intelligence · Hackathon Build</span>
+          <div className="footer-bottom-r">
+            <span className="footer-bottom-link">Privacy</span>
+            <span className="footer-bottom-link">Terms</span>
+            <span className="footer-bottom-link">GitHub</span>
+          </div>
+        </div>
+      </footer>
+
     </div>
   )
 }

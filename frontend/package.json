@@ -12,6 +12,7 @@
     "@lottiefiles/react-lottie-player": "^3.6.0",
     "axios": "^1.6.7",
     "clsx": "^2.1.0",
+    "globe.gl": "^2.45.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.263.1",
     "react": "^18.2.0",
