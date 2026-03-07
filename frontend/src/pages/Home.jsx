@@ -583,7 +583,11 @@ export default function Home() {
         .footer-grid {
           padding: 3.5rem 3rem 2rem;
           display: grid;
+<<<<<<< HEAD
           grid-template-columns: 2fr 1fr 1fr 1fr;
+=======
+          grid-template-columns: 2fr 1fr 1fr;
+>>>>>>> d25832fc965b848f9b673c6db0faa45a90052318
           gap: 3rem;
         }
         .footer-brand {
@@ -965,12 +969,15 @@ export default function Home() {
               <span key={t} className="footer-link">{t}</span>
             ))}
           </div>
+<<<<<<< HEAD
           <div>
             <div className="footer-col-title">Team</div>
             {['Manikya — Frontend','Muaaz — AI & Backend','Vaishnavi — OR Engine','Rajkumar — OR Engine'].map(t => (
               <span key={t} className="footer-link">{t}</span>
             ))}
           </div>
+=======
+>>>>>>> d25832fc965b848f9b673c6db0faa45a90052318
         </div>
         <div className="footer-bottom">
           <span className="footer-bottom-l">© 2025 Lorri · Load Consolidation Intelligence · Hackathon Build</span>

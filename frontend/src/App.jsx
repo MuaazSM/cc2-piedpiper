@@ -42,10 +42,17 @@ export default function App() {
 
       <Routes>
         <Route path="/" element={<Home />} />
+<<<<<<< HEAD
         <Route path="/shipments" element={<Layout><Shipments /></Layout>} />
         <Route path="/optimize"  element={<Layout><Optimize /></Layout>} />
         <Route path="/scenarios" element={<Layout><Scenarios /></Layout>} />
         <Route path="/insights"  element={<Layout><Insights /></Layout>} />
+=======
+        <Route path="/shipments" element={<Shipments />} />
+        <Route path="/optimize"  element={<Optimize />} />
+        <Route path="/scenarios" element={<Scenarios />} />
+        <Route path="/insights"  element={<Insights />} />
+>>>>>>> d25832fc965b848f9b673c6db0faa45a90052318
       </Routes>
     </>
   )
