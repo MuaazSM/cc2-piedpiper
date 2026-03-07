@@ -2,14 +2,15 @@
 Optimization endpoint — triggers the full consolidation pipeline.
 
 POST /optimize kicks off:
-1. Validation Agent checks input data
+1. Validation Agent checks input data 
 2. ML compatibility scoring (TODO)
-3. OR-Tools solver builds the plan (TODO)
-4. Insight Agent explains the results (TODO)
+3. OR-Tools solver builds the plan (TODO — placeholder for now)
+4. Insight Agent explains the results 
 
 Returns a consistent JSON shape every time:
 - validation: always present (errors, warnings, info, llm_summary)
 - plan: present only if validation passed and solver ran
+- insights: present only if a plan was generated
 """
 
 from fastapi import APIRouter, Depends
@@ -19,6 +20,7 @@ from backend.app.models.shipment import Shipment
 from backend.app.models.vehicle import Vehicle
 from backend.app.models.plan import ConsolidationPlan, PlanStatusEnum
 from backend.app.agents.validation_agent import run_validation
+from backend.app.agents.insight_agent import run_insight_analysis
 
 router = APIRouter()
 
@@ -31,16 +33,18 @@ def run_optimization(db: Session = Depends(get_db)):
     Always returns a 200 with a consistent response shape:
     {
         "validation": { ... },   // always present
-        "plan": { ... } | null   // null if validation failed or no data
+        "plan": { ... } | null,  // null if validation failed or no data
+        "insights": { ... } | null  // null if no plan was generated
     }
 
     The frontend uses validation.is_valid to decide whether to show
     the plan view or the validation issues panel. Warnings and info
     are shown alongside the plan even when optimization succeeds.
+    Insights are rendered in the agent insights panel.
     """
-    # --- Step 0: Load all shipments and vehicles from the DB ---
-    # Convert ORM objects to plain dicts so the validation agent
-    # doesn't need to know about SQLAlchemy internals.
+    # Step 0: Load all shipments and vehicles from the DB
+    # Convert ORM objects to plain dicts so the agents
+    # don't need to know about SQLAlchemy internals.
     shipment_rows = db.query(Shipment).all()
     vehicle_rows = db.query(Vehicle).all()
 
@@ -85,6 +89,7 @@ def run_optimization(db: Session = Depends(get_db)):
                 "llm_summary": None,
             },
             "plan": None,
+            "insights": None,
         }
 
     if not vehicles:
@@ -100,9 +105,10 @@ def run_optimization(db: Session = Depends(get_db)):
                 "llm_summary": None,
             },
             "plan": None,
+            "insights": None,
         }
 
-    # --- Step 1: Run the Validation Agent ---
+    # Step 1: Run the Validation Agent
     validation_report = run_validation(shipments, vehicles)
 
     # If validation found critical errors, return the report without running the solver.
@@ -111,15 +117,16 @@ def run_optimization(db: Session = Depends(get_db)):
         return {
             "validation": validation_report,
             "plan": None,
+            "insights": None,
         }
 
-    # --- Step 2: TODO — ML compatibility scoring ---
+    # Step 2: TODO — ML compatibility scoring
     # compatibility_graph = compatibility_model.score(shipments)
 
-    # --- Step 3: TODO — OR-Tools solver ---
-    # plan = solver.optimize(shipments, vehicles, compatibility_graph)
+    # Step 3: TODO — OR-Tools solver
+    # solver_result = solver.optimize(shipments, vehicles, compatibility_graph)
 
-    # --- PLACEHOLDER: create a draft plan until solver is wired in ---
+    # PLACEHOLDER: create a draft plan until solver is wired in
     plan = ConsolidationPlan(
         status=PlanStatusEnum.DRAFT,
         total_trucks=0,
@@ -132,24 +139,36 @@ def run_optimization(db: Session = Depends(get_db)):
     db.commit()
     db.refresh(plan)
 
-    # --- Step 4: TODO — Insight Agent explains results ---
-    # insight = insight_agent.explain(plan)
+    # Build the plan dict for the response and for the insight agent
+    plan_dict = {
+        "id": plan.id,
+        "created_at": plan.created_at.isoformat() if plan.created_at else None,
+        "status": plan.status.value,
+        "total_trucks": plan.total_trucks,
+        "trips_baseline": plan.trips_baseline,
+        "avg_utilization": plan.avg_utilization,
+        "cost_saving_pct": plan.cost_saving_pct,
+        "carbon_saving_pct": plan.carbon_saving_pct,
+        "assignments": [],
+        "scenarios": [],
+    }
 
-    # Return both validation report and plan together.
-    # Even on success, warnings and info are included so the frontend
-    # can display them alongside the plan results.
+    # Step 4: Run the Insight Agent
+    # Even with a draft plan (no assignments), the insight agent will return
+    # a "no assignments to analyze" message. Once the solver is wired in,
+    # this will produce full lane-level insights and risk flags.
+    insights = run_insight_analysis(
+        plan=plan_dict,
+        assignments=[],  # Empty until solver is wired in
+        shipments=shipments,
+        vehicles=vehicles,
+    )
+
+    # Step 5: TODO — Constraint Relaxation Agent (if infeasible)
+    # Step 6: TODO — Scenario Recommendation Agent
+
     return {
         "validation": validation_report,
-        "plan": {
-            "id": plan.id,
-            "created_at": plan.created_at.isoformat() if plan.created_at else None,
-            "status": plan.status.value,
-            "total_trucks": plan.total_trucks,
-            "trips_baseline": plan.trips_baseline,
-            "avg_utilization": plan.avg_utilization,
-            "cost_saving_pct": plan.cost_saving_pct,
-            "carbon_saving_pct": plan.carbon_saving_pct,
-            "assignments": [],
-            "scenarios": [],
-        },
+        "plan": plan_dict,
+        "insights": insights,
     }

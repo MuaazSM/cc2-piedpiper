@@ -25,9 +25,7 @@ from backend.app.data_loader.synthetic_generator import get_distance
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
 
-# ---------------------------------------------------------------------------
 # Validation report structure
-# ---------------------------------------------------------------------------
 
 def create_issue(
     severity: str,
@@ -55,9 +53,7 @@ def create_issue(
     }
 
 
-# ---------------------------------------------------------------------------
 # Core validation rules (pure Python, no LLM)
-# ---------------------------------------------------------------------------
 
 def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
     """
@@ -87,13 +83,11 @@ def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
     fleet_types = set(v["vehicle_type"] for v in vehicles)
     has_refrigerated = "refrigerated" in fleet_types
 
-    # -----------------------------------------------------------------------
     # Per-shipment checks
-    # -----------------------------------------------------------------------
     for s in shipments:
         sid = s.get("shipment_id", "UNKNOWN")
 
-        # --- CRITICAL: Missing required fields ---
+        # CRITICAL: Missing required fields 
         # These fields are absolutely necessary for the optimizer to work.
         required_fields = ["origin", "destination", "weight", "volume", "pickup_time", "delivery_time"]
         for field in required_fields:
@@ -103,7 +97,7 @@ def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
                     "ERROR", f"Missing required field: {field}", sid, field
                 ))
 
-        # --- CRITICAL: Duplicate shipment IDs ---
+        # CRITICAL: Duplicate shipment IDs 
         # The optimizer assigns each shipment exactly once — duplicates break this.
         if sid in seen_ids:
             errors.append(create_issue(
@@ -111,7 +105,7 @@ def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
             ))
         seen_ids.add(sid)
 
-        # --- CRITICAL: Negative or zero weight/volume ---
+        #  CRITICAL: Negative or zero weight/volume 
         # Physics doesn't allow negative freight. Zero weight means empty shipment.
         weight = s.get("weight", 0)
         volume = s.get("volume", 0)
@@ -124,7 +118,7 @@ def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
                 "ERROR", f"Volume must be positive, got {volume}", sid, "volume"
             ))
 
-        # --- CRITICAL: Delivery time before pickup time ---
+        # CRITICAL: Delivery time before pickup time 
         # Can't deliver something before it's picked up.
         pickup = s.get("pickup_time")
         delivery = s.get("delivery_time")
@@ -154,7 +148,7 @@ def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
                     sid, "delivery_time"
                 ))
 
-            # --- WARNING: Pickup time in the past ---
+            # WARNING: Pickup time in the past 
             # Not a hard blocker, but suspicious — might be stale data.
             if pickup < datetime.now():
                 warnings.append(create_issue(
@@ -163,7 +157,7 @@ def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
                     sid, "pickup_time"
                 ))
 
-            # --- WARNING: Very tight delivery window for long distances ---
+            # WARNING: Very tight delivery window for long distances 
             # If someone expects Mumbai→Delhi delivery in 2 hours, that's not realistic.
             origin = s.get("origin", "")
             destination = s.get("destination", "")
@@ -181,7 +175,7 @@ def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
                         sid, "delivery_time"
                     ))
 
-        # --- WARNING: Shipment too heavy for any vehicle in the fleet ---
+        #  WARNING: Shipment too heavy for any vehicle in the fleet 
         # The optimizer will fail to assign this shipment if no truck can carry it.
         if isinstance(weight, (int, float)) and weight > max_fleet_weight:
             warnings.append(create_issue(
@@ -191,7 +185,7 @@ def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
                 sid, "weight"
             ))
 
-        # --- WARNING: Shipment too large for any vehicle in the fleet ---
+        #  WARNING: Shipment too large for any vehicle in the fleet 
         if isinstance(volume, (int, float)) and volume > max_fleet_volume:
             warnings.append(create_issue(
                 "WARNING",
@@ -200,7 +194,7 @@ def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
                 sid, "volume"
             ))
 
-        # --- WARNING: Refrigerated shipment but no reefer trucks ---
+        #  WARNING: Refrigerated shipment but no reefer trucks 
         special = s.get("special_handling")
         if special == "refrigerated" and not has_refrigerated:
             warnings.append(create_issue(
@@ -209,11 +203,9 @@ def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
                 sid, "special_handling"
             ))
 
-    # -----------------------------------------------------------------------
     # Fleet-level checks
-    # -----------------------------------------------------------------------
 
-    # --- WARNING: Fleet might be too small ---
+    #  WARNING: Fleet might be too small 
     # Quick sanity check: if total fleet weight capacity is less than total shipment weight,
     # we definitely can't fit everything even with perfect packing.
     total_shipment_weight = sum(s.get("weight", 0) for s in shipments if isinstance(s.get("weight"), (int, float)))
@@ -225,7 +217,7 @@ def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
             f"({total_fleet_weight:.0f}kg). Some shipments may not be assignable.",
         ))
 
-    # --- INFO: Fleet size relative to shipment count ---
+    #  INFO: Fleet size relative to shipment count 
     if len(vehicles) > 0 and len(shipments) > len(vehicles) * 5:
         info.append(create_issue(
             "INFO",
@@ -233,7 +225,7 @@ def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
             f"Consider adding more vehicles for better consolidation options.",
         ))
 
-    # --- INFO: Origin distribution imbalance ---
+    #  INFO: Origin distribution imbalance 
     # If most shipments come from one city, consolidation opportunities are limited.
     if shipments:
         origin_counts = {}
@@ -250,7 +242,7 @@ def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
                 f"Heavily skewed origins may limit consolidation diversity.",
             ))
 
-    # --- INFO: Priority distribution ---
+    #  INFO: Priority distribution 
     # Let the user know if many shipments defaulted to MEDIUM
     if shipments:
         medium_count = sum(1 for s in shipments if s.get("priority") == "MEDIUM")
@@ -261,9 +253,7 @@ def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
                 f"Consider setting priorities to enable smarter SLA-based optimization.",
             ))
 
-    # -----------------------------------------------------------------------
     # Build the final report
-    # -----------------------------------------------------------------------
     is_valid = len(errors) == 0
 
     return {
@@ -281,9 +271,7 @@ def validate_shipments(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
     }
 
 
-# ---------------------------------------------------------------------------
 # LLM-powered summary (optional, uses Gemini via LangChain)
-# ---------------------------------------------------------------------------
 
 def generate_llm_summary(validation_report: Dict) -> Optional[str]:
     """
@@ -345,9 +333,7 @@ def generate_llm_summary(validation_report: Dict) -> Optional[str]:
         return None
 
 
-# ---------------------------------------------------------------------------
 # Main entry point — combines rule checks + LLM summary
-# ---------------------------------------------------------------------------
 
 def run_validation(shipments: List[Dict], vehicles: List[Dict]) -> Dict:
     """
