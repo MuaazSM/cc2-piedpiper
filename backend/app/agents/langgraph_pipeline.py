@@ -632,6 +632,66 @@ def build_graph() -> StateGraph:
 pipeline = build_graph()
 
 
+# ---------------------------------------------------------------------------
+# Graph diagram export
+# ---------------------------------------------------------------------------
+
+def export_graph_diagram(
+    output_dir: str = "data",
+    filename: str = "langgraph_flow",
+) -> Dict[str, str]:
+    """
+    Export the LangGraph state graph as a Mermaid diagram.
+
+    Calls LangGraph's built-in .get_graph().draw_mermaid() to produce
+    a Mermaid-formatted flowchart string. Saves it to a .mermaid file
+    that can be:
+    - Pasted into GitHub README (renders natively)
+    - Opened in https://mermaid.live for editing
+    - Embedded in presentation slides
+    - Converted to PNG via mermaid-cli (mmdc)
+
+    Args:
+        output_dir: Directory to save the output files
+        filename: Base filename (without extension)
+
+    Returns:
+        Dict with file paths and the raw mermaid string
+    """
+    import os
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Get the mermaid diagram from LangGraph's built-in export
+    mermaid_str = pipeline.get_graph().draw_mermaid()
+
+    # Save the raw mermaid file
+    mermaid_path = os.path.join(output_dir, f"{filename}.mermaid")
+    with open(mermaid_path, "w") as f:
+        f.write(mermaid_str)
+
+    print(f"[LangGraph Export] Mermaid diagram saved to {mermaid_path}")
+
+    # Try to generate PNG using draw_mermaid_png if available.
+    # This requires the 'mermaid' extra or an API call — falls back
+    # gracefully if not available.
+    png_path = None
+    try:
+        png_bytes = pipeline.get_graph().draw_mermaid_png()
+        png_path = os.path.join(output_dir, f"{filename}.png")
+        with open(png_path, "wb") as f:
+            f.write(png_bytes)
+        print(f"[LangGraph Export] PNG diagram saved to {png_path}")
+    except Exception as e:
+        print(f"[LangGraph Export] PNG export skipped: {e}")
+        print(f"[LangGraph Export] To generate PNG manually, paste the .mermaid file into https://mermaid.live")
+
+    return {
+        "mermaid_path": mermaid_path,
+        "png_path": png_path,
+        "mermaid_string": mermaid_str,
+    }
+
+
 def run_pipeline(
     shipments: List[Dict],
     vehicles: List[Dict],
