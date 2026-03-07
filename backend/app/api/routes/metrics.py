@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from backend.app.db.session import get_db
 from backend.app.models.plan import ConsolidationPlan, ScenarioResult
 from backend.app.schemas.plan import MetricsResponse, ScenarioResultResponse
+from backend.app.agents.tools.outcome_logging_tool import get_outcome_history
 
 router = APIRouter()
 
@@ -49,3 +50,9 @@ def get_metrics(
         carbon_saving_pct=plan.carbon_saving_pct,
         scenarios=[ScenarioResultResponse.model_validate(s) for s in scenarios],
     )
+
+
+@router.get("/history")
+def get_history(limit: int = Query(20, ge=1, le=100)):
+    """Return recent outcome-logging history."""
+    return get_outcome_history(limit=limit)

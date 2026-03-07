@@ -1019,13 +1019,18 @@ def run_pipeline(
         clean_plan = {
             "status": raw_plan.get("status"),
             "assigned": raw_plan.get("assigned", []),
-            "unassigned": [s.get("shipment_id", "") for s in raw_plan.get("unassigned", [])],
+            "unassigned": [
+                s.get("shipment_id", "") if isinstance(s, dict) else s
+                for s in raw_plan.get("unassigned", [])
+            ],
             "is_infeasible": raw_plan.get("is_infeasible", False),
             "total_trucks": raw_plan.get("total_trucks", 0),
             "trips_baseline": raw_plan.get("trips_baseline", 0),
             "avg_utilization": raw_plan.get("avg_utilization", 0),
             "cost_saving_pct": raw_plan.get("cost_saving_pct", 0),
             "carbon_saving_pct": raw_plan.get("carbon_saving_pct", 0),
+            "solver_used": raw_plan.get("solver_used"),
+            "solver_status": raw_plan.get("solver_status"),
         }
 
     return {
