@@ -107,6 +107,10 @@ Lorri AI is built as a **three-layer intelligence system** where each layer ampl
 
 No single layer could do this alone. **The magic is in their orchestration.**
 
+### Architecture Diagram
+
+![Architecture Diagram](architecture-diagram.png)
+
 ---
 
 ## 🤖 The Agent Loop
@@ -155,6 +159,10 @@ Solver feasible      → Simulate → Insight → Recommend → Learn → END
 ```
 
 **This is not a linear pipeline. It's a state machine that reasons about its own failures and self-corrects.**
+
+### User Flow
+
+![User Flow](user-flow.png)
 
 ---
 
